@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-'''
-@File    :   main.py
-@Time    :   2019/04/22 13:21:38
-@Author  :   Wu
-@Version :   2.1
-@Desc    :   main python file of the project
-'''
+# python main.py --model resnet --model_depth 34 --n_classes 3
+
 
 import torch
 import torch.utils.data as Data
@@ -23,12 +18,17 @@ from logger import log, tensorboard_dir, is_aug, model_name, PATH_trained_model,
 import utility.save_load
 import utility.fitting
 import process.load_dataset
-import models.resnets
+# import models.resnets
 import utility.evaluation
 import random
 
+
 from models.resnet import *
 # from models.densenet import *
+
+from opts import parse_opts
+from model import generate_model
+
 
 # remove the tensorboard_dir before running
 try:
@@ -37,7 +37,7 @@ except Exception as e:
     print(e)
 
 # Device configuration, cpu, cuda:0/1/2/3 available
-device = torch.device('cuda:3')
+device = torch.device('cuda:0')
 
 data_chooses = [2]  # choose dataset. 0: the small dataset, 1: CC_ROI, 2: 6_ROI
 num_classes = 3
@@ -148,6 +148,51 @@ model = resnet34(pretrained=True, num_classes=num_classes)
 # model = resnet152(pretrained=True, num_classes=num_classes)
 # model = densenet121(pretrained=True, num_classes=num_classes)
 
+# ------  use other's 3d resnet ----------
+# opt = parse_opts()
+# model, parameters = generate_model(opt)
+
+# ----- transform wrong ----------------------
+# for name, module in model.named_modules():
+#     if(isinstance(module, nn.Conv2d)):
+#         kernel_size = module.kernel_size[0]
+#         stride = module.stride[0]
+#         padding = module.padding[0]
+#         weight = module.weight.unsqueeze(2) / kernel_size
+#         weight = torch.cat([weight for _ in range(0, kernel_size)], dim=2)
+#         bias = module.bias
+#
+#         if(bias is None):
+#             modules[name] = nn.Conv3d(in_channels=module.weight.shape[1], out_channels=module.weight.shape[0],
+#                                kernel_size=kernel_size, padding=padding, stride=stride, bias=False)
+#         else:
+#             module[name] = nn.Conv3d(in_channels=module.weight.shape[1], out_channels=module.weight.shape[0],
+#                                kernel_size=kernel_size, padding=padding, stride=stride, bias=True)
+#             module[name].bias = bias
+#
+#             module[name].weight.data = weight
+#
+#     elif(isinstance(module, nn.BatchNorm2d)):
+#         weight = module.weight
+#         bias = module.bias
+#         module[name] = nn.BatchNorm3d(weight.shape[0])
+#         module[name].weight = weight
+#         module[name].bias = bias
+#
+# for name in module:
+#     parent_module = model
+#     objs = name.split(".")
+#     if len(objs) == 1:
+#         model.__setattr__(name, module[name])
+#         continue
+#
+#     for obj in objs[:-1]:
+#         parent_module = parent_module.__getattr__(obj)
+#
+#     parent_module.__setattr__(objs[-1], module[name])
+#
+#
+
 optimizer = torch.optim.SGD(params=model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
 loss_func = nn.CrossEntropyLoss(
     weight=torch.tensor(class_weight)) if is_class_weighted_loss_func else nn.CrossEntropyLoss()
@@ -160,7 +205,7 @@ try:
 except KeyboardInterrupt as e:
     log.logger.error('KeyboardInterrupt: {}'.format(e))
 except Exception as e:
-    log.logger.error('Exception: {}'.format(e))
+    log.logger.error('Exception: {}'.format(e), exc_info=True) # 输出error的traceback
 finally:
     log.logger.info("Train finished")
     utility.save_load.save_model(
@@ -168,7 +213,7 @@ finally:
         path='{}{}.pt'.format(PATH_trained_model, model_name)
     )
     model = utility.save_load.load_model(
-        model=models.resnets.resnet34(num_classes=num_classes, img_in_channels=1),
+        model=model,
         path='{}{}.pt'.format(PATH_trained_model, model_name),
         device=device
     )
