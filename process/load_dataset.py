@@ -64,7 +64,7 @@ tumor_post_path = "/MRI/T2tumor.mha"
 def _load_tumor(img_path):
     '''
         @ param: p_id为str类型，表示病人的编号
-        @ return: 返回这个病人的tumor标注的mri图像的(N,512,512),N 为深度，即.dcm的张数
+        @ return: 返回这个病人的tumor标注的mri图像的(N,512,512)
         读取一个病人的T2的mri图像的肿瘤标记图像，图像文件格式为mha
         mha为三维数组，元素为0/1 int
     '''

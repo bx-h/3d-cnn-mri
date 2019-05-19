@@ -32,8 +32,10 @@ def train(model, train_loader, loss_func, optimizer, device):
 
     # train the model using minibatch
     for i, (images, targets, _) in enumerate(train_loader):
+
         #images = np.expand_dims(images, axis=1)
         #images = torch.from_numpy(images)
+
         images = images.to(device)
         targets = targets.to(device)
 

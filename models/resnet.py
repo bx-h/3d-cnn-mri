@@ -24,11 +24,13 @@ class BasicBlock(nn.Module):
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(BasicBlock, self).__init__()
+
         self.conv1 = conv1x3x3(inplanes, planes, stride)
         self.bn1 = nn.BatchNorm3d(planes)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv1x3x3(planes, planes)
         self.bn2 = nn.BatchNorm3d(planes)
+
         self.downsample = downsample
         self.stride = stride
 
@@ -95,6 +97,7 @@ class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=1000):
         self.inplanes = 64
         super(ResNet, self).__init__()
+
         self.conv1_ = nn.Conv3d(1, 64, kernel_size=(1,7,7), stride=(1,2,2), padding=(0,3,3),
                                 bias=False)
 
@@ -105,6 +108,7 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+
         self.avgpool = nn.AvgPool3d(kernel_size=(1,7,7), stride=1)
         self.fc_ = nn.Linear(512 * block.expansion, num_classes)
 
@@ -211,7 +215,6 @@ def resnet50(pretrained=False, **kwargs):
     return model
 
 
-
 def resnet101(pretrained=False, **kwargs):
     """Constructs a ResNet-101 model.
     Args:
@@ -241,4 +244,5 @@ def resnet152(pretrained=False, **kwargs):
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
         model_dict.update(pretrained_dict)
         model.load_state_dict(model_dict)
+
     return model
