@@ -146,7 +146,7 @@ test_loader = torch.utils.data.DataLoader(dataset=test_data, batch_size=batch_si
 # model = models.resnets.resnet18(pretrained=True, num_classes=num_classes, img_in_channels=1)
 
 # model = resnet34(pretrained=False, num_classes=num_classes)
-=======
+
 model = resnet34(pretrained=True, num_classes=num_classes)
 # model = resnet152(pretrained=True, num_classes=num_classes)
 # model = densenet121(pretrained=True, num_classes=num_classes)
