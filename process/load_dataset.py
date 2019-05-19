@@ -64,7 +64,7 @@ tumor_post_path = "/MRI/T2tumor.mha"
 def _load_tumor(img_path):
     '''
         @ param: p_id为str类型，表示病人的编号
-        @ return: 返回这个病人的tumor标注的mri图像的(N,512,512)
+        @ return: 返回这个病人的tumor标注的mri图像的(N,512,512),N 为深度，即.dcm的张数
         读取一个病人的T2的mri图像的肿瘤标记图像，图像文件格式为mha
         mha为三维数组，元素为0/1 int
     '''
@@ -121,9 +121,9 @@ def _load_inf(data_choose):
 def _get_image_paths(data_choose, patient_id):
     """
     获取一个病人的所有slides的路径, 除去没有肿瘤区域的slides
-    return a `list`, the paths of the images (slides) in `img_dir`\\
-    Args: \\
-        img_dir: the directory of the images (slides)\\
+    return a `list`, the paths of the images (slides) in `img_dir`
+    Args:
+        img_dir: the directory of the images (slides)
     """
     # if there is no such directory, return an empty list.
     # Notice: Some directories are in the excel file, while not exist in the dataset folder.
@@ -173,7 +173,17 @@ def _get_image_paths(data_choose, patient_id):
         #     log.logger.critical("tumor and slide don't match! {} {} {} {}".format(tumor_index[i], paths[tumor_index[i]], int(paths[tumor_index[i]][-6:-4]), tumor_index[i] + 1 == int(paths[tumor_index[i]][-6:-4])))
 
     return mri_img_paths, tumor_index, tumor_hw_min_max
-
+# 样例输出：
+# tumor_hw_min_Max: <class 'list'>: [[267, 309, 233, 264], [265, 317, 234, 281], [261, 317, 243, 284], [259, 314, 246, 283], [248, 306, 241, 283], [245, 303, 224, 276], [248, 292, 227, 267]]
+# tumor_index: <class 'list'>: [5, 6, 7, 8, 9, 10, 11]
+# mri_img_paths:
+# <class 'list'>: ['/data/weishizheng/hbx/2019_rect_pcr_data/6_ROI/sub333/MRI/T2/IMG-0001-00006.dcm',
+# '/data/weishizheng/hbx/2019_rect_pcr_data/6_ROI/sub333/MRI/T2/IMG-0001-00007.dcm',
+# '/data/weishizheng/hbx/2019_rect_pcr_data/6_ROI/sub333/MRI/T2/IMG-0001-00008.dcm',
+# '/data/weishizheng/hbx/2019_rect_pcr_data/6_ROI/sub333/MRI/T2/IMG-0001-00009.dcm',
+# '/data/weishizheng/hbx/2019_rect_pcr_data/6_ROI/sub333/MRI/T2/IMG-0001-00010.dcm',
+# '/data/weishizheng/hbx/2019_rect_pcr_data/6_ROI/sub333/MRI/T2/IMG-0001-00011.dcm',
+# '/data/weishizheng/hbx/2019_rect_pcr_data/6_ROI/sub333/MRI/T2/IMG-0001-00012.dcm']
 
 def init_dataset(data_chooses=[0], test_size=0.2, std_spacing_method="global_std_spacing_mode", new_init=False):
     """
@@ -197,7 +207,8 @@ def init_dataset(data_chooses=[0], test_size=0.2, std_spacing_method="global_std
 
     json_dataset = {"train": [], "test": []}  # 储存路径、label和id
 
-    ## 划分数据集 ################################################################################################
+    ## 划分数据集
+
     for data_choose in data_chooses:
         log.logger.info("Initializing dataset {} ...".format(data_choose))
 
