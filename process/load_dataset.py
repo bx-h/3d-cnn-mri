@@ -461,7 +461,12 @@ class MriDataset(Data.Dataset):
         label = self.dataset[index]['label']
         id = self.dataset[index]['id']
 
+        #print("HHHHHHHHH:")
+        #print(img.shape)
+
         # print(self.dataset[index]["resize_coef"])
+        img = np.expand_dims(img, axis=1)
+        img = torch.from_numpy(img)
         return img, label, id
 
     def __len__(self):
