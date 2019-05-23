@@ -64,7 +64,7 @@ tumor_post_path = "/MRI/T2tumor.mha"
 def _load_tumor(img_path):
     '''
         @ param: p_id为str类型，表示病人的编号
-        @ return: 返回这个病人的tumor标注的mri图像的(N,512,512),N 为深度，即.dcm的张数
+        @ return: 返回这个病人的tumor标注的mri图像的(N,512,512)
         读取一个病人的T2的mri图像的肿瘤标记图像，图像文件格式为mha
         mha为三维数组，元素为0/1 int
     '''
@@ -91,7 +91,7 @@ def _load_inf(data_choose):
     df = pd.read_excel(io=xlsx_path, sheet_name=sheet_name)  # 打开excel文件
 
     patient_ids = df.iloc[:, 0].values  # 读取编号列
-    patient_labels = df[u'结局'].values  # 读取结局列
+    patient_labels = df[u'新辅助后病理疗效评价'].values  # 读取结局列
     patient_T2_resolution = df[u'T2序列分辨率'].values  # 读取T2序列分辨率
 
     patient_T2_resolution = patient_T2_resolution[~np.isnan(patient_labels)]  # 删掉 nan
@@ -259,6 +259,28 @@ def init_dataset(data_chooses=[0], test_size=0.2, std_spacing_method="global_std
             min(json_dataset["test_hw_min_max"][2], json_dataset["train_hw_min_max"][2]),
             max(json_dataset["test_hw_min_max"][3], json_dataset["train_hw_min_max"][3])
         ]
+
+
+        # 新增将图像按病人划分
+        json_dataset["trainBypatient"] = {}
+        json_dataset["testBypatient"] = {}
+        for dataset_type in ["train", "test"]:
+            hw_min_max = []
+            for patient_id, patient_label in dataset[dataset_type].items():
+                #json_dataset[dataset_type + "Bypatient"] = []
+                json_dataset[dataset_type + "Bypatient"][patient_id] = []
+                mri_img_paths, tumor_index, tumor_hw_min_max = _get_image_paths(data_choose, patient_id)
+                for i in range(len(mri_img_paths)):  # 对于每个病人的每张slide
+                    json_dataset[dataset_type + "Bypatient"][patient_id].append({
+                        'path': mri_img_paths[i],
+                        'label': patient_label,
+                        'id': str(data_choose) + '_' + patient_id,
+                        'tumor_index': tumor_index[i],
+                        'tumor_hw_min_max': tumor_hw_min_max[i]
+                    })
+                # 列表拼接，如 [[273, 300, 268, 288], [270, 312, 264, 290]] + [265, 312, 261, 290] = [[273, 300, 268, 288], [270, 312, 264, 290], [265, 312, 261, 290]]
+                hw_min_max += tumor_hw_min_max
+
     ############################################################################################################
 
     ## 训练集和测试集分别统计均值方差，并记录一些信息 ##############################################################
@@ -406,6 +428,8 @@ class MriDataset(Data.Dataset):
             self.normalize = transforms.Compose([transforms.Normalize(mean=[mean_std[0]], std=[mean_std[1]])])
 
             self.dataset = self.dataset_info[self.data_type]
+            #add
+            self.datasetBypatient = self.dataset_info[self.data_type + "Bypatient"]
 
             # self.hw_min_max = self.dataset_info["global_hw_min_max_spc"]
 
@@ -464,10 +488,81 @@ class MriDataset(Data.Dataset):
         #print("HHHHHHHHH:")
         #print(img.shape)
 
-        # print(self.dataset[index]["resize_coef"])
+        # print
         img = np.expand_dims(img, axis=1)
         img = torch.from_numpy(img)
-        return img, label, id
+
+        # add
+        imgs = torch.Tensor([[]])
+        counter = 0
+        for patientid, _ in self.datasetBypatient.items(): #{sub001: [], sub002:[]}
+            if counter != index:
+                counter += 1
+                continue
+            else:
+                datas = self.datasetBypatient[patientid]
+                for j in range(len(datas)):
+                    img = read_image(datas[j]['path'])  # img, 数据格式(h, w, c), 类型numpy int16
+                    img = Image.fromarray(img, mode="I;16")  # img, 数据格式(h, w, c), 类型PIL.Image.Image image mode=I;16
+
+                    # -1. spacing resize
+                    if self.is_spacing is True:
+                        shape = self.dataset[index]["shape"]
+                        shape_spc = self.dataset[index]["shape_spc"]
+                        if shape[0] != shape_spc[0]:
+                            img = img.resize(size=(shape_spc[0], shape_spc[1]),
+                                             resample=Image.NEAREST)  # spacing resize
+                        if shape_spc[0] != self.max_size_spc:
+                            img = transforms.Compose([transforms.CenterCrop(size=self.max_size_spc)])(
+                                img)  # centercrop to the max_img size
+
+                        center_w = (self.global_hw_min_max_spc_world[3] + self.global_hw_min_max_spc_world[2]) / 2
+                        llength = self.global_hw_min_max_spc_world[1] - self.global_hw_min_max_spc_world[0] + 1
+                        left = int(round(center_w - llength / 2))
+                        img = img.crop((
+                            left,  # left
+                            self.global_hw_min_max_spc_world[0],  # upper
+                            left + llength,  # right
+                            self.global_hw_min_max_spc_world[1] + 1  # lower
+                        ))
+                        # img = img.crop((
+                        #     self.global_hw_min_max_spc_world[2],    # left
+                        #     self.global_hw_min_max_spc_world[0],    # upper
+                        #     self.global_hw_min_max_spc_world[3]+1,    # right
+                        #     self.global_hw_min_max_spc_world[1]+1     # lower
+                        # ))
+                    img = img.resize(size=(224, 224), resample=Image.NEAREST)
+
+                    # 0. 在这里做数据增广
+                    if self.transform != None:
+                        img = self.transform(img)
+
+                    # 1. 转成tensor; img, 数据格式(c, h, w), 类型tensor torch.int16; 注意这里的ToTensor不会将像素值scale到0~1
+                    img = transforms.Compose([transforms.ToTensor()])(img)
+
+                    # 2. 类型转换; img, 数据格式(c, h, w), 类型tensor torch.float32
+                    img = img.float()
+
+                    # 3. 归一化
+                    if self.normalize != None:
+                        img = self.normalize(img)
+
+                    label = self.dataset[index]['label']
+                    id = self.dataset[index]['id']
+                    ## add
+                    #imgs = imgs.numpy()
+                   # imgs.append(imgs, img)
+                    #img = img.unsqueeze(0)
+                    #imgs = torch.cat([imgs,img], 0)
+                    img = img.numpy()
+                    imgs = imgs.numpy()
+                    imgs = np.append(imgs, img)
+                    imgs = torch.from_numpy(imgs)
+
+
+                break
+        #change
+        return imgs, label, id
 
     def __len__(self):
         return len(self.dataset)

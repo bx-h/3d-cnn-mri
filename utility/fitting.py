@@ -28,7 +28,7 @@ def train(model, train_loader, loss_func, optimizer, device):
     device: train on cpu or gpu device
     """
     total_loss = 0
-    model.train()
+    model.train()  # ????
 
     # train the model using minibatch
     for i, (images, targets, _) in enumerate(train_loader):
@@ -122,10 +122,14 @@ def fit(model, num_epochs, optimizer, device, train_loader, test_loader, train_l
     # loss and optimizer
     # loss_func = nn.CrossEntropyLoss()
 
+    # 使用GPU
     model.to(device)
     loss_func.to(device)
 
     # log train loss and test accuracy
+
+    # ？：类别的训练与测试准确率？？
+
     losses = []
     train_accs = []
     test_accs = []
@@ -133,17 +137,22 @@ def fit(model, num_epochs, optimizer, device, train_loader, test_loader, train_l
     test_class_accs = [[], [], []]
 
     ######### tensorboard #########
+    # tensorboard_dir : tblogs
+
+    # 定义并初始化tensorboard writer
     writer_loss = tf.summary.FileWriter(tensorboard_dir + '/train_loss/')
     writer_acc = [tf.summary.FileWriter(tensorboard_dir + '/train/'), tf.summary.FileWriter(tensorboard_dir + '/test/')]
     writer_train_class = [tf.summary.FileWriter(tensorboard_dir + '/train_class{}/'.format(i)) for i in range(3)]
     writer_test_class = [tf.summary.FileWriter(tensorboard_dir + '/test_class{}/'.format(i)) for i in range(3)]
 
+    # ？：log_var是什么？？
     log_var = [tf.Variable(0.0) for i in range(4)]
     tf.summary.scalar('train loss', log_var[0])
     tf.summary.scalar('acc', log_var[1])
     tf.summary.scalar('train class acc', log_var[2])
     tf.summary.scalar('test class acc', log_var[3])
 
+    # ？:merge_all
     write_op = tf.summary.merge_all()
     session = tf.InteractiveSession()
     session.run(tf.global_variables_initializer())
@@ -164,13 +173,13 @@ def fit(model, num_epochs, optimizer, device, train_loader, test_loader, train_l
         test_accuracy, test_confusion, test_class_acc = utility.evaluation.evaluate(model, test_loader, device,
                                                                                     num_classes, test=True)
 
-        # lr decay
+        # lr decay（learning rate decay 学习率衰减）
         if lr_decay_period != None:
             if (epoch + 1) % lr_decay_period == 0:
                 for param_group in optimizer.param_groups:
                     param_group['lr'] /= lr_decay_rate
 
-        ######### tensorboard #########
+        ######### tensorboard ######### 绘制曲线
         # train loss curve
         summary = session.run(write_op, {log_var[0]: float(loss)})
         writer_loss.add_summary(summary, epoch)
@@ -201,6 +210,7 @@ def fit(model, num_epochs, optimizer, device, train_loader, test_loader, train_l
 
         ######### tensorboard #########
 
+        # 每个epoch记录一次准确率结果
         train_accs.append(train_accuracy)
         test_accs.append(test_accuracy)
         train_class_accs[0].append(train_class_acc[0])
